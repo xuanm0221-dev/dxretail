@@ -1052,7 +1052,7 @@ export default function Dashboard() {
                           {isSummary ? (
                             <span className="flex items-center gap-2">
                               <span className="text-lg">📊</span>
-                              {row.label}
+                              {(row as SummaryRow).label}
                             </span>
                           ) : isManualInput ? (
                             <div className="flex items-center gap-2">
