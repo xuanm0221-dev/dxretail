@@ -1,0 +1,37 @@
+{
+  "lastUpdated": "2025-12-13T05:15:30.488Z",
+  "manualDecValues": {
+    "shop-CN6385": 639100,
+    "shop-CN6382": 597600,
+    "shop-CN6384": 423300,
+    "shop-CN6383": 332000,
+    "shop-CN6409": 257300,
+    "shop-CN6410": 182600,
+    "shop-CN6414": 190900,
+    "shop-CN6423": 207500,
+    "shop-CN6424": 597600,
+    "shop-CN6428": 830000,
+    "shop-CN6433": 282200,
+    "shop-CN6435": 257300,
+    "shop-CN6434": 83000,
+    "shop-CN6426": 91300,
+    "shop-CN6446": 332000,
+    "shop-CN6445": 207500,
+    "shop-CN6452": 224100,
+    "shop-1105": 290400,
+    "shop-1106": 308000,
+    "shop-1117": 616000
+  },
+  "manualNewFrValues": {
+    "manual_fr_1": 4150,
+    "manual_fr_2": 5000,
+    "manual_fr_3": 8300,
+    "manual_fr_4": 149400
+  },
+  "manualNewFrNames": {
+    "manual_fr_1": "(하얼빈) 단풍마을",
+    "manual_fr_2": "(선양) 티에시 MixC",
+    "manual_fr_3": "(항저우) 시시 롱후 파라다이스 워크",
+    "manual_fr_4": "(광저우) IGC"
+  }
+}

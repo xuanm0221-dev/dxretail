@@ -1,0 +1,6 @@
+node_modules
+.next
+snowflake.log
+.env.local
+.env*.local
+.playwright-mcp
