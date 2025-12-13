@@ -734,7 +734,7 @@ export default function Dashboard() {
     let newShopDesc = "";
     // 신규점 오픈 현황
     if (newShops.length > 0) {
-      const openMonths = [...new Set(newShops.map(s => s.openMonth))].sort();
+      const openMonths = Array.from(new Set(newShops.map(s => s.openMonth))).sort();
       const monthRange = openMonths.length > 1 ? `${openMonths[0]}~${openMonths[openMonths.length - 1]}` : openMonths[0];
       const strongNewShops = newShops.filter(s => s.lastMonth > 200000);
       const weakNewShops = newShops.filter(s => s.lastMonth > 0 && s.lastMonth < 50000);
