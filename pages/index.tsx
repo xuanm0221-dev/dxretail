@@ -1126,8 +1126,8 @@ export default function Dashboard() {
                                 {isManualInput 
                                   ? <span className="text-gray-400">-</span>
                                   : isSummary && (row.rowType === 'fr_count' || row.rowType === 'or_count')
-                                    ? formatCount(row.months[month])
-                                    : formatNumber(isSummary ? row.months[month] : (row as ShopRow).months[month])
+                                    ? formatCount((row as SummaryRow).months[month])
+                                    : formatNumber(isSummary ? (row as SummaryRow).months[month] : (row as ShopRow).months[month])
                                 }
                               </span>
                             </td>
@@ -1144,8 +1144,8 @@ export default function Dashboard() {
                           {isSummary ? (
                             <span className="block truncate">
                               {(row.rowType === 'fr_count' || row.rowType === 'or_count')
-                                ? formatCount(row.months['25.12'])
-                                : formatNumber(row.months['25.12'])
+                                ? formatCount((row as SummaryRow).months['25.12'])
+                                : formatNumber((row as SummaryRow).months['25.12'])
                               }
                             </span>
                           ) : isManualInput ? (
