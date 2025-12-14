@@ -1,4 +1,18 @@
 import { useState, useEffect, useMemo } from 'react';
+import dynamic from 'next/dynamic';
+
+// ECharts는 SSR에서 문제가 있으므로 dynamic import
+const ChinaMapChart = dynamic(() => import('../components/ChinaMapChart'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-96 bg-white rounded-xl">
+      <div className="text-center">
+        <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-gray-200 border-t-blue-500 mb-3"></div>
+        <p className="text-gray-500">지도 로딩 중...</p>
+      </div>
+    </div>
+  ),
+});
 
 interface SalesData {
   sale_ym: string;
@@ -857,10 +871,6 @@ export default function Dashboard() {
 
               {/* 우측 점포현황 박스 */}
               <div className="lg:col-span-1 bg-gradient-to-b from-sky-50 to-white rounded-xl border border-sky-100 shadow-sm overflow-hidden">
-                <div className="bg-gradient-to-r from-sky-200 to-sky-300 px-4 py-2 flex items-center gap-2">
-                  <span className="text-sky-700 text-lg">🏪</span>
-                  <span className="text-sky-700 font-bold text-sm">점포현황</span>
-                </div>
                 <div className="p-3">
                   {/* 대리상 / 직영 좌우 배치 */}
                   <div className="grid grid-cols-2 gap-2">
@@ -1189,6 +1199,15 @@ export default function Dashboard() {
             새로고침
           </button>
         </div>
+
+        {/* 지도 섹션 */}
+        {!loading && !error && (
+          <section className="mt-8">
+            <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-6">
+              <ChinaMapChart />
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );
