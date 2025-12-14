@@ -350,15 +350,23 @@ export default function ChinaMapChart() {
     }
   }, [handleShopSelect]);
 
-  // 중국 지도 GeoJSON 등록
+  // 지도 로딩 상태
+  const [mapLoaded, setMapLoaded] = useState(false);
+
+  // 중국 지도 GeoJSON 등록 (로컬 파일 사용)
   useEffect(() => {
-    fetch('https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json')
-      .then(res => res.json())
+    fetch('/china.json')
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to load map');
+        return res.json();
+      })
       .then(data => {
         echarts.registerMap('china', data);
+        setMapLoaded(true);
       })
       .catch(err => {
         console.error('Failed to load China map:', err);
+        setError('지도 데이터를 불러오는데 실패했습니다.');
       });
   }, []);
 
@@ -531,13 +539,22 @@ export default function ChinaMapChart() {
       <div className="grid grid-cols-10 gap-4 h-[500px]">
         {/* 지도 영역 (6/10 = 60%) */}
         <div className="col-span-6 bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
-          <ReactECharts
-            ref={chartRef}
-            option={getChartOption()}
-            style={{ height: '100%', width: '100%' }}
-            onEvents={onEvents}
-            opts={{ renderer: 'canvas' }}
-          />
+          {!mapLoaded ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                <p className="text-gray-500">지도를 불러오는 중...</p>
+              </div>
+            </div>
+          ) : (
+            <ReactECharts
+              ref={chartRef}
+              option={getChartOption()}
+              style={{ height: '100%', width: '100%' }}
+              onEvents={onEvents}
+              opts={{ renderer: 'canvas' }}
+            />
+          )}
         </div>
 
         {/* 우측 패널 (4/10 = 40%) */}
