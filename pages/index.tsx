@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import BrandTabs from '../components/BrandTabs';
 import YearSelector from '../components/YearSelector';
+import DealerSalesTable from '../components/DealerSalesTable';
 
 // ECharts는 SSR에서 문제가 있으므로 dynamic import
 const ChinaMapChart = dynamic(() => import('../components/ChinaMapChart'), {
@@ -74,7 +75,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [manualDecValues, setManualDecValues] = useState<Record<string, number | null>>({});
-  const [collapsed, setCollapsed] = useState(true);
+  const [collapsedFR, setCollapsedFR] = useState(true);
+  const [collapsedOR, setCollapsedOR] = useState(true);
   const [selectedYear, setSelectedYear] = useState('2025');
   
   // 신규대리상 수기입력 값
@@ -388,20 +390,30 @@ export default function Dashboard() {
     return rows;
   }, [shopRows, summaryRows, manualInputRows]);
 
-  // 요약 행만 필터링
-  const summaryRowsOnly = useMemo(() => {
-    return allRows.filter(r =>
-      r.rowType === 'fr_avg' ||
-      r.rowType === 'fr_count' ||
-      r.rowType === 'or_avg' ||
-      r.rowType === 'or_count'
-    );
-  }, [allRows]);
-
-  // visibleRows 결정
+  // visibleRows 결정 (FR과 OR 각각 독립적으로 펼치기/접기)
   const visibleRows = useMemo(() => {
-    return collapsed ? summaryRowsOnly : allRows;
-  }, [collapsed, summaryRowsOnly, allRows]);
+    return allRows.filter(row => {
+      // 요약 행은 항상 표시
+      if (row.type === 'summary') return true;
+      
+      // 신규대리상 수기입력 행
+      if (row.type === 'manual_input') {
+        return !collapsedFR; // 대리상이 펼쳐져 있을 때만 표시
+      }
+      
+      // 일반 매장 행
+      if (row.type === 'detail') {
+        if (row.channel === 'FR') {
+          return !collapsedFR; // 대리상이 펼쳐져 있을 때만 표시
+        }
+        if (row.channel === 'OR') {
+          return !collapsedOR; // 직영이 펼쳐져 있을 때만 표시
+        }
+      }
+      
+      return true;
+    });
+  }, [allRows, collapsedFR, collapsedOR]);
 
   // 대리상(FR) 25.11 기준 TOP3 shop_id 계산
   const top3FrShopIds = useMemo(() => {
@@ -949,14 +961,6 @@ export default function Dashboard() {
           </section>
         )}
 
-        {/* 연도 선택 */}
-        {!loading && !error && (
-          <YearSelector 
-            selectedYear={selectedYear} 
-            onYearChange={setSelectedYear} 
-          />
-        )}
-
         {/* 로딩 상태 */}
         {loading && (
           <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
@@ -996,7 +1000,22 @@ export default function Dashboard() {
 
         {/* 메인 테이블 */}
         {!loading && !error && visibleRows.length > 0 && (
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden w-full">
+          <>
+            {/* 섹션 제목 + 연도 선택 */}
+            <div className="mb-6 bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-1 h-8 bg-purple-500 rounded-full"></div>
+                  <h2 className="text-xl font-bold text-gray-800">1. 점당매출</h2>
+                </div>
+                <YearSelector 
+                  selectedYear={selectedYear} 
+                  onYearChange={setSelectedYear} 
+                />
+              </div>
+            </div>
+            
+            <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden w-full">
             <div className="w-full overflow-x-auto overflow-y-auto max-h-[calc(100vh-300px)]">
               <table className="border-collapse w-full" style={{ tableLayout: 'fixed', minWidth: '1730px' }}>
                 {/* 컬럼 너비 고정 */}
@@ -1009,20 +1028,11 @@ export default function Dashboard() {
                   ))}
                 </colgroup>
                 {/* 고정 헤더 */}
-                <thead className="sticky top-0 z-50">
-                  <tr className="bg-[#1E3A5F]">
-                    <th className="sticky left-0 z-50 bg-[#1E3A5F] border-r border-blue-800 px-3 py-3 text-left font-bold text-white shadow-lg">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate">매장명</span>
-                        <button
-                          type="button"
-                          onClick={() => setCollapsed(prev => !prev)}
-                          className="rounded-full border border-white/30 px-2 py-0.5 text-xs text-white hover:bg-white/20 transition-colors flex-shrink-0"
-                        >
-                          {collapsed ? '펼치기' : '접기'}
-                        </button>
-                      </div>
-                    </th>
+            <thead className="sticky top-0 z-40">
+              <tr className="bg-[#1E3A5F]">
+                <th className="sticky left-0 z-45 bg-[#1E3A5F] border-r border-blue-800 px-3 py-3 text-left font-bold text-white shadow-lg">
+                  <span className="truncate">매장명</span>
+                </th>
                     <th className="sticky left-[260px] z-50 bg-[#1E3A5F] border-r border-blue-800 px-2 py-3 text-center font-bold text-white shadow-lg">
                       채널
                     </th>
@@ -1088,6 +1098,25 @@ export default function Dashboard() {
                             <span className="flex items-center gap-2">
                               <span className="text-lg">📊</span>
                               {(row as SummaryRow).label}
+                              {/* 대리상/직영 요약 행에 펼치기 버튼 추가 */}
+                              {(row.rowType === 'fr_avg' || row.rowType === 'fr_count') && row.rowType === 'fr_avg' && (
+                                <button
+                                  type="button"
+                                  onClick={() => setCollapsedFR(prev => !prev)}
+                                  className="ml-2 rounded-full border border-sky-400 bg-sky-50 px-2 py-0.5 text-xs text-sky-700 hover:bg-sky-100 transition-colors flex-shrink-0"
+                                >
+                                  {collapsedFR ? '펼치기' : '접기'}
+                                </button>
+                              )}
+                              {(row.rowType === 'or_avg' || row.rowType === 'or_count') && row.rowType === 'or_avg' && (
+                                <button
+                                  type="button"
+                                  onClick={() => setCollapsedOR(prev => !prev)}
+                                  className="ml-2 rounded-full border border-blue-400 bg-blue-50 px-2 py-0.5 text-xs text-blue-700 hover:bg-blue-100 transition-colors flex-shrink-0"
+                                >
+                                  {collapsedOR ? '펼치기' : '접기'}
+                                </button>
+                              )}
                             </span>
                           ) : isManualInput ? (
                             <div className="flex items-center gap-2">
@@ -1219,6 +1248,7 @@ export default function Dashboard() {
               </table>
             </div>
           </div>
+          </>
         )}
 
         {/* 하단 정보 및 새로고침 */}
@@ -1248,6 +1278,11 @@ export default function Dashboard() {
               <ChinaMapChart brand="X" year={selectedYear} />
             </div>
           </section>
+        )}
+
+        {/* 대리상별 출고/판매 매출 표 */}
+        {!loading && !error && (
+          <DealerSalesTable brand="X" initialYear={selectedYear} />
         )}
       </div>
     </div>

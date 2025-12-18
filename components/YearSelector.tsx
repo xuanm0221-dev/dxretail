@@ -7,8 +7,8 @@ export default function YearSelector({ selectedYear, onYearChange }: YearSelecto
   const years = ['2023', '2024', '2025'];
 
   return (
-    <div className="flex justify-center mb-6">
-      <div className="inline-flex rounded-full bg-slate-100 p-1 shadow-inner">
+    <div className="flex">
+      <div className="inline-flex rounded-lg bg-gray-100 p-1 gap-1">
         {years.map((year) => {
           const isActive = selectedYear === year;
           
@@ -16,10 +16,10 @@ export default function YearSelector({ selectedYear, onYearChange }: YearSelecto
             <button
               key={year}
               onClick={() => onYearChange(year)}
-              className={`relative px-6 py-2.5 rounded-full text-sm font-bold transition-all duration-300 whitespace-nowrap ${
+              className={`relative px-5 py-2 rounded-md text-sm font-semibold transition-all duration-200 whitespace-nowrap ${
                 isActive
-                  ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg scale-105'
-                  : 'text-slate-600 hover:text-slate-800 hover:bg-slate-50'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
               }`}
             >
               {year}년
