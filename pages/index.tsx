@@ -29,6 +29,7 @@ interface SalesData {
   city_tier_nm: string | null;
   shop_level_nm: string | null;
   sale_region_nm: string | null;
+  mono_multi_cd: number | null;
 }
 
 interface ShopRow {
@@ -43,6 +44,7 @@ interface ShopRow {
   city_tier_nm: string | null; // 도시 티어
   shop_level_nm: string | null; // 매장 타입 (Outlet, Pop-up 등)
   sale_region_nm: string | null; // 지역 구분
+  mono_multi_cd: number | null; // mono/multi 구분 (1=mono, 0=multi)
 }
 
 interface SummaryRow {
@@ -258,7 +260,8 @@ export default function Dashboard() {
           city_nm: item.city_nm,
           city_tier_nm: item.city_tier_nm,
           shop_level_nm: item.shop_level_nm,
-          sale_region_nm: item.sale_region_nm
+          sale_region_nm: item.sale_region_nm,
+          mono_multi_cd: item.mono_multi_cd
         });
       }
 
@@ -302,12 +305,18 @@ export default function Dashboard() {
       const monthsData: Record<string, number | null> = {};
       
       months.forEach(month => {
-        const monthData = rows
+        // 매출: 모든 매장(mono + multi) 포함
+        const allMonthData = rows
           .map(row => row.months[month])
           .filter((val): val is number => val !== null && val > 0);
+        let total = allMonthData.reduce((sum, val) => sum + val, 0);
         
-        let total = monthData.reduce((sum, val) => sum + val, 0);
-        let count = monthData.length;
+        // 매장수: mono 매장만 카운트 (mono_multi_cd = 1)
+        const monoRows = rows.filter(row => row.mono_multi_cd === 1);
+        const monoMonthData = monoRows
+          .map(row => row.months[month])
+          .filter((val): val is number => val !== null && val > 0);
+        let count = monoMonthData.length;
         
         // 2025년 12월일 때만 수기입력 값 추가
         if (selectedYear === '2025' && month === '25.12') {

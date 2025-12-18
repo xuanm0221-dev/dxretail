@@ -12,6 +12,7 @@ interface SalesData {
   city_tier_nm: string | null;
   shop_level_nm: string | null;
   sale_region_nm: string | null;
+  mono_multi_cd: number | null;
 }
 
 export default async function handler(req, res) {
@@ -41,6 +42,7 @@ export default async function handler(req, res) {
             , m.city_tier_nm
             , m.shop_level_nm
             , m.sale_region_nm
+            , m.mono_multi_cd
         FROM chn.dw_sale s
         JOIN FNF.CHN.MST_SHOP_ALL m
           ON s.shop_id = m.shop_id
@@ -61,6 +63,7 @@ export default async function handler(req, res) {
             , m.city_tier_nm
             , m.shop_level_nm
             , m.sale_region_nm
+            , m.mono_multi_cd
       )
       SELECT *
       FROM base
@@ -81,7 +84,8 @@ export default async function handler(req, res) {
       city_nm: row.CITY_NM || row.city_nm || null,
       city_tier_nm: row.CITY_TIER_NM || row.city_tier_nm || null,
       shop_level_nm: row.SHOP_LEVEL_NM || row.shop_level_nm || null,
-      sale_region_nm: row.SALE_REGION_NM || row.sale_region_nm || null
+      sale_region_nm: row.SALE_REGION_NM || row.sale_region_nm || null,
+      mono_multi_cd: Number(row.MONO_MULTI_CD ?? row.mono_multi_cd ?? null)
     }));
 
     res.status(200).json(normalizedRows);
