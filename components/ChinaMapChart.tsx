@@ -274,7 +274,12 @@ const formatYuan = (num: number): string => {
   return new Intl.NumberFormat('ko-KR').format(Math.round(num));
 };
 
-export default function ChinaMapChart() {
+interface ChinaMapChartProps {
+  brand?: 'X' | 'M' | 'I'; // X=Discovery, M=MLB, I=MLB KIDS
+  year?: string; // 2023, 2024, 2025
+}
+
+export default function ChinaMapChart({ brand = 'X', year = '2025' }: ChinaMapChartProps) {
   const [cityData, setCityData] = useState<CityData[]>([]);
   const [selectedCity, setSelectedCity] = useState<CityData | null>(null);
   const [selectedShop, setSelectedShop] = useState<ShopInfo | null>(null);
@@ -292,7 +297,7 @@ export default function ChinaMapChart() {
     const fetchCityData = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`/api/map-data?period=${periodTab}`);
+        const response = await fetch(`/api/map-data?period=${periodTab}&brand=${brand}&year=${year}`);
         if (!response.ok) {
           throw new Error('데이터를 불러오는데 실패했습니다.');
         }
@@ -312,13 +317,13 @@ export default function ChinaMapChart() {
     };
 
     fetchCityData();
-  }, [periodTab]);
+  }, [periodTab, brand, year]);
 
   // 매장 클릭 시 상품 Top 5 로드
   const fetchProductTop = useCallback(async (shopId: string) => {
     try {
       setProductLoading(true);
-      const response = await fetch(`/api/map-data?type=shop-products&shop_id=${shopId}&period=${periodTab}`);
+      const response = await fetch(`/api/map-data?type=shop-products&shop_id=${shopId}&period=${periodTab}&brand=${brand}&year=${year}`);
       if (!response.ok) {
         throw new Error('상품 데이터를 불러오는데 실패했습니다.');
       }
@@ -330,7 +335,7 @@ export default function ChinaMapChart() {
     } finally {
       setProductLoading(false);
     }
-  }, [periodTab]);
+  }, [periodTab, brand, year]);
 
   // 매장 선택 핸들러
   const handleShopSelect = useCallback((shop: ShopInfo) => {
@@ -392,7 +397,16 @@ export default function ChinaMapChart() {
       });
     });
 
-    const titleText = periodTab === 'monthly' ? '도시별 매출 분포 (25.11 당월)' : '도시별 매출 분포 (25.01~25.11 누적)';
+    // 연도별 마지막 월 결정
+    const yearPrefix = year.slice(-2);
+    let lastMonth = '12';
+    if (year === '2025' && (brand === 'M' || brand === 'I')) {
+      lastMonth = '11';
+    }
+    
+    const titleText = periodTab === 'monthly' 
+      ? `도시별 매출 분포 (${yearPrefix}.${lastMonth} 당월)` 
+      : `도시별 매출 분포 (${yearPrefix}.01~${yearPrefix}.${lastMonth} 누적)`;
 
     return {
       backgroundColor: '#f8fafc',

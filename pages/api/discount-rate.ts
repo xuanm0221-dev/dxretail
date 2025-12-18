@@ -8,6 +8,17 @@ interface DiscountRateData {
 
 export default async function handler(req, res) {
   try {
+    // 브랜드 파라미터: X=Discovery, M=MLB, I=MLB KIDS
+    const { brand = 'X', year = '2025' } = req.query;
+    const brandCode = ['X', 'M', 'I'].includes(brand) ? brand : 'X';
+    const selectedYear = ['2023', '2024', '2025'].includes(year) ? year : '2025';
+    
+    // 연도별 종료월 결정
+    let endMonth = '12';
+    if (selectedYear === '2025' && (brandCode === 'M' || brandCode === 'I')) {
+      endMonth = '11'; // MLB, MLB KIDS는 2025년 11월까지만
+    }
+    
     const sql = `
       WITH base AS (
         SELECT
@@ -19,9 +30,9 @@ export default async function handler(req, res) {
         JOIN FNF.CHN.MST_SHOP_ALL m
           ON s.shop_id = m.shop_id
         WHERE 1 = 1
-          AND s.brd_cd = 'X'
-          AND s.sale_dt >= '2025-01-01'
-          AND s.sale_dt <= '2025-10-31'
+          AND s.brd_cd = '${brandCode}'
+          AND s.sale_dt >= '${selectedYear}-01-01'
+          AND s.sale_dt <= '${selectedYear}-${endMonth}-31'
           AND s.tag_amt > 0
           AND m.anlys_onoff_cls_nm = 'Offline'
           AND m.anlys_shop_type_nm IN ('FO', 'FP')

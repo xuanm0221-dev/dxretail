@@ -27,13 +27,23 @@ interface ProductTop {
 }
 
 export default async function handler(req: any, res: any) {
-  const { type, shop_id, period } = req.query;
+  const { type, shop_id, period, brand = 'X', year = '2025' } = req.query;
   
-  // 기간 설정: 'monthly' = 당월(25.11), 'cumulative' = 누적(25.01~25.11)
+  // 브랜드 파라미터: X=Discovery, M=MLB, I=MLB KIDS
+  const brandCode = ['X', 'M', 'I'].includes(brand) ? brand : 'X';
+  const selectedYear = ['2023', '2024', '2025'].includes(year) ? year : '2025';
+  
+  // 연도별 종료월 결정
+  let endMonth = '12';
+  if (selectedYear === '2025' && (brandCode === 'M' || brandCode === 'I')) {
+    endMonth = '11'; // MLB, MLB KIDS는 2025년 11월까지만
+  }
+  
+  // 기간 설정: 'monthly' = 당월(마지막월), 'cumulative' = 누적(01~마지막월)
   const isMonthly = period === 'monthly';
   const dateCondition = isMonthly 
-    ? "TO_CHAR(s.sale_dt, 'YYYY-MM') = '2025-11'"
-    : "TO_CHAR(s.sale_dt, 'YYYY-MM') BETWEEN '2025-01' AND '2025-11'";
+    ? `TO_CHAR(s.sale_dt, 'YYYY-MM') = '${selectedYear}-${endMonth}'`
+    : `TO_CHAR(s.sale_dt, 'YYYY-MM') BETWEEN '${selectedYear}-01' AND '${selectedYear}-${endMonth}'`;
 
   try {
     if (type === 'shop-products' && shop_id) {
@@ -46,7 +56,7 @@ export default async function handler(req: any, res: any) {
           SUM(s.tag_amt) as tag_amt
         FROM chn.dw_sale s
         LEFT JOIN FNF.CHN.MST_PRDT p ON s.prdt_cd = p.prdt_cd
-        WHERE s.brd_cd = 'X'
+        WHERE s.brd_cd = '${brandCode}'
           AND s.shop_id = '${shop_id}'
           AND ${dateCondition}
         GROUP BY s.prdt_cd, p.prdt_nm_kr
@@ -85,7 +95,7 @@ export default async function handler(req: any, res: any) {
           SUM(s.sale_amt) as sale_amt
         FROM chn.dw_sale s
         JOIN FNF.CHN.MST_SHOP_ALL m ON s.shop_id = m.shop_id
-        WHERE s.brd_cd = 'X'
+        WHERE s.brd_cd = '${brandCode}'
           AND ${dateCondition}
           AND m.anlys_onoff_cls_nm = 'Offline'
           AND m.anlys_shop_type_nm IN ('FO', 'FP')
