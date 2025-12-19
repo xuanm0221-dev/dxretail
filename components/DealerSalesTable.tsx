@@ -219,7 +219,7 @@ export default function DealerSalesTable({ brand, initialYear = '2025' }: Dealer
           <div className="flex items-center gap-3">
             <div className={`w-1 h-8 ${getBrandColor()} rounded-full`}></div>
             <div className="flex items-center gap-2">
-              <h2 className="text-xl font-bold text-gray-800">2. 대리상별 출고/판매 매출</h2>
+              <h2 className="text-xl font-bold text-gray-800">2. 대리상별 출고Tag/판매Tag</h2>
               <span className="text-sm text-gray-500">(총 {filteredDealers.length}개)</span>
             </div>
           </div>
@@ -237,6 +237,14 @@ export default function DealerSalesTable({ brand, initialYear = '2025' }: Dealer
               onYearChange={(year) => setSelectedYear(year)} 
             />
           </div>
+        </div>
+        
+        {/* 데이터 기준 안내 */}
+        <div className="mt-3 pt-3 border-t border-gray-100">
+          <p className="text-xs text-gray-500 leading-relaxed">
+            <span className="font-semibold">데이터 원천:</span> 출고=dw_cn_copa_d.tag_sale_amt (채널84) + 판매=dw_sale.tag_amt (FR매장) + dw_shop_wh_detail (매장매핑) + mst_account (계정마스터) | 
+            <span className="font-semibold ml-2">집계:</span> 월별·대리상별 합계, 소수점 2자리
+          </p>
         </div>
       </div>
 

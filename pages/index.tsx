@@ -752,14 +752,33 @@ export default function MLBDashboard() {
             {/* 섹션 제목 + 연도 선택 */}
             <div className="mb-6 bg-white rounded-xl shadow-sm border border-gray-200 p-4">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-4">
                   <div className="w-1 h-8 bg-blue-500 rounded-full"></div>
                   <h2 className="text-xl font-bold text-gray-800">1. 점당매출</h2>
+                  <div className="flex items-center gap-3 text-xs text-gray-500">
+                    <div className="flex items-center gap-1">
+                      <span className="inline-block w-3 h-3 rounded-full bg-blue-100 border border-blue-300"></span>
+                      <span>FR(대리상)</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="inline-block w-3 h-3 rounded-full bg-gray-100 border border-gray-300"></span>
+                      <span>OR(직영)</span>
+                    </div>
+                  </div>
                 </div>
                 <YearSelector 
                   selectedYear={selectedYear} 
                   onYearChange={setSelectedYear} 
                 />
+              </div>
+              
+              {/* 데이터 기준 안내 */}
+              <div className="mt-3 pt-3 border-t border-gray-100">
+                <p className="text-xs text-gray-500 leading-relaxed">
+                  <span className="font-semibold">데이터 원천:</span> dm_sh_s_m (월별집계) + dw_shop_wh_detail (매장매핑) + mst_shop_all (매장마스터) | 
+                  <span className="font-semibold ml-2">필터:</span> 매장타입 FP/FO, 오프라인, 최신매핑 | 
+                  <span className="font-semibold ml-2">계산:</span> 총실판=월별매출합계, 점당매출=총실판÷매장수, 매장수=월별매출&gt;0인 매장
+                </p>
               </div>
             </div>
             
@@ -930,25 +949,6 @@ export default function MLBDashboard() {
           </>
         )}
 
-        {/* 하단 정보 및 새로고침 */}
-        <div className="mt-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/60 backdrop-blur-sm rounded-xl p-4 shadow-md">
-          <p className="text-sm text-gray-600 flex items-center gap-2">
-            <span className="text-blue-500">💡</span>
-            <span>
-              {selectedYear === '2025' 
-                ? 'MLB 브랜드는 2025년 1~11월 데이터만 표시됩니다.' 
-                : `MLB 브랜드 ${selectedYear}년 데이터를 표시하고 있습니다. (1~12월)`
-              }
-            </span>
-          </p>
-          <button
-            onClick={fetchData}
-            className="px-5 py-2.5 bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-lg hover:from-gray-600 hover:to-gray-700 font-semibold shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105 flex items-center gap-2"
-          >
-            <span>🔄</span>
-            새로고침
-          </button>
-        </div>
 
         {/* 지도 섹션 */}
         {!loading && !error && (
@@ -959,7 +959,7 @@ export default function MLBDashboard() {
           </section>
         )}
 
-        {/* 대리상별 출고/판매 매출 표 */}
+        {/* 대리상별 출고Tag/판매Tag 표 */}
         {!loading && !error && (
           <DealerSalesTable brand="M" initialYear={selectedYear} />
         )}
