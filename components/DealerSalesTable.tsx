@@ -4,6 +4,7 @@ import YearSelector from './YearSelector';
 interface DealerData {
   account_id: string;
   account_nm_en: string;
+  hq_sap_id: string;
   shipment_months: Record<string, number>;
   sales_months: Record<string, number>;
 }
@@ -86,6 +87,77 @@ export default function DealerSalesTable({ brand, initialYear = '2025' }: Dealer
     return new Intl.NumberFormat('ko-KR').format(Math.round(num));
   };
 
+  // CSV용 숫자 포맷 (소수점 2자리)
+  const formatNumberForCSV = (num: number | null | undefined): string => {
+    if (num === null || num === undefined) return '';
+    if (num === 0) return '0.00';
+    return num.toFixed(2);
+  };
+
+  // CSV 다운로드 함수
+  const downloadCSV = () => {
+    const brandName = brand === 'M' ? 'MLB' : brand === 'I' ? 'MLB_KIDS' : 'Discovery';
+    const fileName = `대리상별_출고판매매출_${brandName}_${selectedYear}.csv`;
+    
+    // CSV 헤더 생성
+    const headers = ['No.', '대리상명(코드)', '구분', ...months.map(m => m.label)];
+    
+    // CSV 데이터 행 생성
+    const rows: string[][] = [];
+    
+    filteredDealers.forEach((dealer, idx) => {
+      // SAP 코드 포맷: hq_sap_id가 있으면 표시, 없으면 account_id만 표시
+      const codeDisplay = dealer.hq_sap_id 
+        ? `(${dealer.account_id}, ${dealer.hq_sap_id.trim()})`
+        : `(${dealer.account_id})`;
+      
+      // 출고매출 행
+      const shipmentRow = [
+        String(idx + 1),
+        `${dealer.account_nm_en} ${codeDisplay}`,
+        '출고매출',
+        ...months.map(month => formatNumberForCSV(dealer.shipment_months[month.key]))
+      ];
+      rows.push(shipmentRow);
+      
+      // 판매매출 행
+      const salesRow = [
+        '', // No. 빈칸 (병합 효과)
+        '', // 대리상명 빈칸 (병합 효과)
+        '판매매출',
+        ...months.map(month => formatNumberForCSV(dealer.sales_months[month.key]))
+      ];
+      rows.push(salesRow);
+    });
+    
+    // CSV 문자열 생성 (UTF-8 BOM 포함)
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => {
+        // 쉼표나 따옴표가 포함된 경우 따옴표로 감싸기
+        if (cell.includes(',') || cell.includes('"') || cell.includes('\n')) {
+          return `"${cell.replace(/"/g, '""')}"`;
+        }
+        return cell;
+      }).join(','))
+    ].join('\n');
+    
+    // BOM 추가 (Excel 한글 호환)
+    const bom = '\uFEFF';
+    const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
+    
+    // 다운로드 링크 생성 및 클릭
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', fileName);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   if (loading) {
     return (
       <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-12 text-center">
@@ -151,10 +223,20 @@ export default function DealerSalesTable({ brand, initialYear = '2025' }: Dealer
               <span className="text-sm text-gray-500">(총 {filteredDealers.length}개)</span>
             </div>
           </div>
-          <YearSelector 
-            selectedYear={selectedYear} 
-            onYearChange={(year) => setSelectedYear(year)} 
-          />
+          <div className="flex items-center gap-3">
+            <button
+              onClick={downloadCSV}
+              className="px-4 py-2 bg-green-500 text-white text-sm rounded-lg hover:bg-green-600 font-medium transition-colors duration-200 shadow-sm hover:shadow-md flex items-center gap-2"
+              title="CSV 파일로 다운로드 (소수점 2자리)"
+            >
+              <span>📥</span>
+              <span>CSV 다운로드</span>
+            </button>
+            <YearSelector 
+              selectedYear={selectedYear} 
+              onYearChange={(year) => setSelectedYear(year)} 
+            />
+          </div>
         </div>
       </div>
 
@@ -227,7 +309,12 @@ export default function DealerSalesTable({ brand, initialYear = '2025' }: Dealer
                     >
                       <div className="flex flex-col">
                         <span className="text-sm">{dealer.account_nm_en}</span>
-                        <span className="text-xs text-gray-500">({dealer.account_id})</span>
+                        <span className="text-xs text-gray-500">
+                          {dealer.hq_sap_id 
+                            ? `(${dealer.account_id}, ${dealer.hq_sap_id.trim()})`
+                            : `(${dealer.account_id})`
+                          }
+                        </span>
                       </div>
                     </td>
                     

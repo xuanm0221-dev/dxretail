@@ -3,6 +3,7 @@ import { runQuery } from "../../lib/snowflake";
 interface DealerSalesData {
   account_id: string;
   account_nm_en: string;
+  hq_sap_id: string;
   sale_ym: string;
   shipment_amt: number;
   sales_amt: number;
@@ -20,7 +21,8 @@ export default async function handler(req, res) {
           TO_CHAR(d.pst_dt, 'YYYY-MM') AS sale_ym,
           a.account_id,
           a.account_nm_en,
-          SUM(d.tag_sale_amt) AS shipment_amt
+          a.hq_sap_id,
+          ROUND(SUM(d.tag_sale_amt), 2) AS shipment_amt
       FROM sap_fnf.dw_cn_copa_d d
       LEFT JOIN chn.mst_account a
         ON TRIM(a.hq_sap_id) = LPAD(TO_VARCHAR(d.sap_shop_cd), 10, '0')
@@ -29,7 +31,7 @@ export default async function handler(req, res) {
         AND d.brd_cd = '${brandCode}'
         AND TO_CHAR(d.pst_dt, 'YYYY') = '${selectedYear}'
         AND a.account_id IS NOT NULL
-      GROUP BY TO_CHAR(d.pst_dt, 'YYYY-MM'), a.account_id, a.account_nm_en
+      GROUP BY TO_CHAR(d.pst_dt, 'YYYY-MM'), a.account_id, a.account_nm_en, a.hq_sap_id
       ORDER BY a.account_id, sale_ym
     `;
 
@@ -50,7 +52,8 @@ export default async function handler(req, res) {
           TO_CHAR(s.sale_dt, 'YYYY-MM') AS sale_ym,
           m.account_id,
           a.account_nm_en,
-          SUM(s.tag_amt) AS sales_amt
+          a.hq_sap_id,
+          ROUND(SUM(s.tag_amt), 2) AS sales_amt
       FROM CHN.dw_sale s
       LEFT JOIN shop_map m ON s.shop_id = m.shop_id
       LEFT JOIN CHN.mst_account a ON m.account_id = a.account_id
@@ -58,7 +61,7 @@ export default async function handler(req, res) {
         AND s.brd_cd = '${brandCode}'
         AND TO_CHAR(s.sale_dt, 'YYYY') = '${selectedYear}'
         AND m.account_id IS NOT NULL
-      GROUP BY TO_CHAR(s.sale_dt, 'YYYY-MM'), m.account_id, a.account_nm_en
+      GROUP BY TO_CHAR(s.sale_dt, 'YYYY-MM'), m.account_id, a.account_nm_en, a.hq_sap_id
       ORDER BY m.account_id, sale_ym
     `;
 
@@ -72,6 +75,7 @@ export default async function handler(req, res) {
     const dealerMap = new Map<string, {
       account_id: string;
       account_nm_en: string;
+      hq_sap_id: string;
       shipment_months: Record<string, number>;
       sales_months: Record<string, number>;
     }>();
@@ -80,6 +84,7 @@ export default async function handler(req, res) {
     shipmentRows.forEach((row: any) => {
       const accountId = row.ACCOUNT_ID || row.account_id;
       const accountName = row.ACCOUNT_NM_EN || row.account_nm_en;
+      const hqSapId = row.HQ_SAP_ID || row.hq_sap_id;
       const saleYm = row.SALE_YM || row.sale_ym;
       const amount = Number(row.SHIPMENT_AMT || row.shipment_amt || 0);
 
@@ -89,6 +94,7 @@ export default async function handler(req, res) {
         dealerMap.set(accountId, {
           account_id: accountId,
           account_nm_en: accountName || accountId,
+          hq_sap_id: hqSapId || '',
           shipment_months: {},
           sales_months: {}
         });
@@ -103,6 +109,7 @@ export default async function handler(req, res) {
     salesRows.forEach((row: any) => {
       const accountId = row.ACCOUNT_ID || row.account_id;
       const accountName = row.ACCOUNT_NM_EN || row.account_nm_en;
+      const hqSapId = row.HQ_SAP_ID || row.hq_sap_id;
       const saleYm = row.SALE_YM || row.sale_ym;
       const amount = Number(row.SALES_AMT || row.sales_amt || 0);
 
@@ -112,6 +119,7 @@ export default async function handler(req, res) {
         dealerMap.set(accountId, {
           account_id: accountId,
           account_nm_en: accountName || accountId,
+          hq_sap_id: hqSapId || '',
           shipment_months: {},
           sales_months: {}
         });
