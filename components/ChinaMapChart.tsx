@@ -274,17 +274,30 @@ const formatYuan = (num: number): string => {
   return new Intl.NumberFormat('ko-KR').format(Math.round(num));
 };
 
+interface ShopRowData {
+  shop_id: string;
+  shop_nm_ko: string;
+  channel: string;
+  open_month: string | null;
+  months: Record<string, number | null>;
+  city_nm: string | null;
+  city_tier_nm: string | null;
+  shop_level_nm: string | null;
+  sale_region_nm: string | null;
+  mono_multi_cd: number | null;
+}
+
 interface ChinaMapChartProps {
   brand?: 'X' | 'M' | 'I'; // X=Discovery, M=MLB, I=MLB KIDS
   year?: string; // 2023, 2024, 2025
+  shopRows: ShopRowData[]; // 점당매출 표의 데이터
 }
 
-export default function ChinaMapChart({ brand = 'X', year = '2025' }: ChinaMapChartProps) {
+export default function ChinaMapChart({ brand = 'X', year = '2025', shopRows }: ChinaMapChartProps) {
   const [cityData, setCityData] = useState<CityData[]>([]);
   const [selectedCity, setSelectedCity] = useState<CityData | null>(null);
   const [selectedShop, setSelectedShop] = useState<ShopInfo | null>(null);
   const [productTop, setProductTop] = useState<ProductTop[]>([]);
-  const [loading, setLoading] = useState(true);
   const [productLoading, setProductLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const chartRef = useRef<ReactECharts>(null);
@@ -292,32 +305,73 @@ export default function ChinaMapChart({ brand = 'X', year = '2025' }: ChinaMapCh
   // 당월/누적 탭 상태
   const [periodTab, setPeriodTab] = useState<'monthly' | 'cumulative'>('monthly');
 
-  // 도시별 데이터 로드
+  // shopRows로부터 도시별 데이터 집계
   useEffect(() => {
-    const fetchCityData = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch(`/api/map-data?period=${periodTab}&brand=${brand}&year=${year}`);
-        if (!response.ok) {
-          throw new Error('데이터를 불러오는데 실패했습니다.');
-        }
-        const data = await response.json();
-        setCityData(data);
-        setError(null);
-        // 탭 변경 시 선택 초기화
-        setSelectedCity(null);
-        setSelectedShop(null);
-        setProductTop([]);
-      } catch (err) {
-        console.error('Error fetching city data:', err);
-        setError(err instanceof Error ? err.message : '알 수 없는 오류');
-      } finally {
-        setLoading(false);
+    try {
+      const yearPrefix = year.slice(-2);
+      let lastMonth = '12';
+      if (year === '2025' && (brand === 'M' || brand === 'I')) {
+        lastMonth = '11';
       }
-    };
-
-    fetchCityData();
-  }, [periodTab, brand, year]);
+      
+      // 도시별로 그룹핑
+      const cityMap = new Map<string, CityData>();
+      
+      shopRows.forEach(shop => {
+        const cityNm = shop.city_nm || '기타';
+        
+        // 당월 또는 누적 매출 계산
+        let saleAmt = 0;
+        if (periodTab === 'monthly') {
+          // 마지막 월 데이터만
+          const lastMonthKey = `${yearPrefix}.${lastMonth}`;
+          saleAmt = shop.months[lastMonthKey] || 0;
+        } else {
+          // 누적 (1월부터 마지막월까지)
+          for (let i = 1; i <= parseInt(lastMonth); i++) {
+            const monthKey = `${yearPrefix}.${String(i).padStart(2, '0')}`;
+            saleAmt += shop.months[monthKey] || 0;
+          }
+        }
+        
+        // 매출이 0인 매장은 제외
+        if (saleAmt === 0) return;
+        
+        if (!cityMap.has(cityNm)) {
+          cityMap.set(cityNm, {
+            city_nm: cityNm,
+            city_tier_nm: shop.city_tier_nm,
+            total_sale_amt: 0,
+            shop_count: 0,
+            shops: [],
+          });
+        }
+        
+        const city = cityMap.get(cityNm)!;
+        city.total_sale_amt += saleAmt;
+        city.shop_count += 1;
+        city.shops.push({
+          shop_id: shop.shop_id,
+          shop_nm_en: shop.shop_nm_ko, // 한국어 이름 사용
+          sale_amt: saleAmt,
+          city_nm: cityNm,
+          city_tier_nm: shop.city_tier_nm,
+        });
+      });
+      
+      const result = Array.from(cityMap.values());
+      setCityData(result);
+      setError(null);
+      
+      // 탭 변경 시 선택 초기화
+      setSelectedCity(null);
+      setSelectedShop(null);
+      setProductTop([]);
+    } catch (err) {
+      console.error('Error processing shop data:', err);
+      setError(err instanceof Error ? err.message : '알 수 없는 오류');
+    }
+  }, [shopRows, periodTab, brand, year]);
 
   // 매장 클릭 시 상품 Top 5 로드
   const fetchProductTop = useCallback(async (shopId: string) => {
@@ -496,16 +550,7 @@ export default function ChinaMapChart({ brand = 'X', year = '2025' }: ChinaMapCh
     click: onChartClick,
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96 bg-white rounded-xl">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-gray-200 border-t-blue-500 mb-3"></div>
-          <p className="text-gray-500">지도 데이터 로딩 중...</p>
-        </div>
-      </div>
-    );
-  }
+  // loading 상태 제거 (데이터는 부모에서 전달받음)
 
   if (error) {
     return (
@@ -595,7 +640,6 @@ export default function ChinaMapChart({ brand = 'X', year = '2025' }: ChinaMapCh
                   .sort((a, b) => b.sale_amt - a.sale_amt)
                   .map((shop) => {
                     const isSelected = selectedShop?.shop_id === shop.shop_id;
-                    const shopName = shopNameKoMap[shop.shop_id] || shop.shop_nm_en;
                     return (
                       <button
                         key={shop.shop_id}
@@ -607,7 +651,7 @@ export default function ChinaMapChart({ brand = 'X', year = '2025' }: ChinaMapCh
                         }`}
                       >
                         <div className="flex justify-between items-center">
-                          <span className="truncate">{shopName}</span>
+                          <span className="truncate">{shop.shop_nm_en}</span>
                           <span className={`text-xs ${isSelected ? 'text-blue-200' : 'text-gray-500'}`}>
                             {formatYuan(shop.sale_amt)}
                           </span>
@@ -646,7 +690,7 @@ export default function ChinaMapChart({ brand = 'X', year = '2025' }: ChinaMapCh
             ) : (
               <div className="space-y-2">
                 <p className="text-xs text-gray-500 mb-2">
-                  {shopNameKoMap[selectedShop.shop_id] || selectedShop.shop_nm_en}
+                  {selectedShop.shop_nm_en}
                 </p>
                 {productTop.map((product, idx) => {
                   const rankColors = [

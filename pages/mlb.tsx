@@ -17,28 +17,53 @@ const ChinaMapChart = dynamic(() => import('../components/ChinaMapChart'), {
   ),
 });
 
-interface SalesData {
-  sale_ym: string;
-  shop_id: string;
-  shop_nm_en: string;
+// API 응답 타입
+interface ApiSummaryRow {
+  row_name: string;
   fr_or_cls: string;
-  open_dt: string | null;
-  oa_shop_id: string | null;
-  sale_amt: number;
+  m01: number | null;
+  m02: number | null;
+  m03: number | null;
+  m04: number | null;
+  m05: number | null;
+  m06: number | null;
+  m07: number | null;
+  m08: number | null;
+  m09: number | null;
+  m10: number | null;
+  m11: number | null;
+  m12: number | null;
+}
+
+interface ApiDetailRow {
+  fr_or_cls: string;
+  shop_id: string;
+  shop_name: string;
+  open_ym: string | null;
   city_nm: string | null;
   city_tier_nm: string | null;
   shop_level_nm: string | null;
   sale_region_nm: string | null;
   mono_multi_cd: number | null;
+  m01: number | null;
+  m02: number | null;
+  m03: number | null;
+  m04: number | null;
+  m05: number | null;
+  m06: number | null;
+  m07: number | null;
+  m08: number | null;
+  m09: number | null;
+  m10: number | null;
+  m11: number | null;
+  m12: number | null;
 }
 
 interface ShopRow {
   shop_id: string;
-  shop_nm_en: string;
   shop_nm_ko: string;
   channel: string;
   open_month: string | null;
-  open_dt: string | null;
   months: Record<string, number | null>;
   city_nm: string | null;
   city_tier_nm: string | null;
@@ -49,7 +74,7 @@ interface ShopRow {
 
 interface SummaryRow {
   type: 'summary';
-  rowType: 'fr_avg' | 'fr_count' | 'or_avg' | 'or_count';
+  rowType: 'fr_total' | 'fr_avg' | 'fr_count' | 'or_total' | 'or_avg' | 'or_count';
   label: string;
   channel: string;
   months: Record<string, number | null>;
@@ -63,7 +88,8 @@ interface DetailRow extends ShopRow {
 type TableRow = DetailRow | SummaryRow;
 
 export default function MLBDashboard() {
-  const [rawData, setRawData] = useState<SalesData[]>([]);
+  const [apiSummaryRows, setApiSummaryRows] = useState<ApiSummaryRow[]>([]);
+  const [apiDetailRows, setApiDetailRows] = useState<ApiDetailRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [collapsedFR, setCollapsedFR] = useState(true);
@@ -109,7 +135,8 @@ export default function MLBDashboard() {
         throw new Error(result.error || '데이터를 불러오는데 실패했습니다.');
       }
       
-      setRawData(result);
+      setApiSummaryRows(result.summaryRows || []);
+      setApiDetailRows(result.detailRows || []);
       setError(null);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.';
@@ -137,124 +164,93 @@ export default function MLBDashboard() {
     return openDt;
   };
 
-  // 매장별로 pivot 변환
+  // API에서 받은 상세 데이터를 ShopRow 형태로 변환
   const shopRows = useMemo(() => {
-    const shopMap = new Map<string, ShopRow>();
-    // 연도와 브랜드에 따른 월 배열 생성
     const yearPrefix = selectedYear.slice(-2);
-    const monthCount = (selectedYear === '2025') ? 11 : 12; // 2025년 MLB는 11월까지
-    const months = Array.from({ length: monthCount }, (_, i) => 
-      `${yearPrefix}.${String(i + 1).padStart(2, '0')}`
-    );
-
-    rawData.forEach(item => {
-      const key = item.shop_id;
+    const monthCount = (selectedYear === '2025') ? 11 : 12;
+    
+    return apiDetailRows.map(detail => {
+      const mappingKey = detail.shop_id.trim().toUpperCase();
+      const koreanName = shopNameKoMap[mappingKey] || detail.shop_name;
       
-      if (!shopMap.has(key)) {
-        const mappingKey = item.oa_shop_id 
-          ? item.oa_shop_id.trim().toUpperCase()
-          : item.shop_id.trim().toUpperCase();
-        
-        const koreanName = shopNameKoMap[mappingKey] || item.shop_nm_en;
-        
-        shopMap.set(key, {
-          shop_id: item.shop_id,
-          shop_nm_en: item.shop_nm_en,
-          shop_nm_ko: koreanName,
-          channel: item.fr_or_cls,
-          open_month: formatOpenMonth(item.open_dt),
-          open_dt: item.open_dt,
-          months: Object.fromEntries(months.map(m => [m, null])),
-          city_nm: item.city_nm,
-          city_tier_nm: item.city_tier_nm,
-          shop_level_nm: item.shop_level_nm,
-          sale_region_nm: item.sale_region_nm,
-          mono_multi_cd: item.mono_multi_cd
-        });
+      const months: Record<string, number | null> = {};
+      for (let i = 1; i <= monthCount; i++) {
+        const monthKey = `${yearPrefix}.${String(i).padStart(2, '0')}`;
+        const apiMonthKey = `m${String(i).padStart(2, '0')}` as keyof ApiDetailRow;
+        months[monthKey] = detail[apiMonthKey] as number | null;
       }
-
-      const shop = shopMap.get(key)!;
-      const [year, month] = item.sale_ym.split('-');
-      const monthKey = `${year.slice(-2)}.${month}`;
       
-      if (shop.months.hasOwnProperty(monthKey)) {
-        shop.months[monthKey] = (shop.months[monthKey] || 0) + item.sale_amt;
-      }
+      return {
+        shop_id: detail.shop_id,
+        shop_nm_ko: koreanName,
+        channel: detail.fr_or_cls,
+        open_month: detail.open_ym,
+        months,
+        city_nm: detail.city_nm,
+        city_tier_nm: detail.city_tier_nm,
+        shop_level_nm: detail.shop_level_nm,
+        sale_region_nm: detail.sale_region_nm,
+        mono_multi_cd: detail.mono_multi_cd
+      };
     });
+  }, [apiDetailRows, selectedYear]);
 
-    return Array.from(shopMap.values());
-  }, [rawData, selectedYear]);
-
-  // 요약 행 계산
+  // 요약 행 계산 (API 응답 변환)
   const summaryRows = useMemo(() => {
     const yearPrefix = selectedYear.slice(-2);
     const monthCount = (selectedYear === '2025') ? 11 : 12;
-    const months = Array.from({ length: monthCount }, (_, i) => 
-      `${yearPrefix}.${String(i + 1).padStart(2, '0')}`
-    );
     
-    const dealerRows = shopRows.filter(s => s.channel === 'FR');
-    const directRows = shopRows.filter(s => s.channel === 'OR');
-
-    const calculateSummary = (rows: ShopRow[], label: string, channel: string, rowType: 'fr_avg' | 'fr_count' | 'or_avg' | 'or_count'): SummaryRow => {
-      const monthsData: Record<string, number | null> = {};
+    return apiSummaryRows.map(apiRow => {
+      const months: Record<string, number | null> = {};
+      for (let i = 1; i <= monthCount; i++) {
+        const monthKey = `${yearPrefix}.${String(i).padStart(2, '0')}`;
+        const apiMonthKey = `m${String(i).padStart(2, '0')}` as keyof ApiSummaryRow;
+        months[monthKey] = apiRow[apiMonthKey] as number | null;
+      }
       
-      months.forEach(month => {
-        // 매출: 모든 매장(mono + multi) 포함
-        const allMonthData = rows
-          .map(row => row.months[month])
-          .filter((val): val is number => val !== null && val > 0);
-        const total = allMonthData.reduce((sum, val) => sum + val, 0);
-        
-        // 매장수: mono 매장만 카운트 (mono_multi_cd = 1)
-        const monoRows = rows.filter(row => row.mono_multi_cd === 1);
-        const monoMonthData = monoRows
-          .map(row => row.months[month])
-          .filter((val): val is number => val !== null && val > 0);
-        const count = monoMonthData.length;
-        
-        if (label.includes('점당매출')) {
-          monthsData[month] = count > 0 ? total / count : 0;
-        } else if (label.includes('매장수')) {
-          monthsData[month] = count;
-        }
-      });
-
+      let rowType: 'fr_total' | 'fr_avg' | 'fr_count' | 'or_total' | 'or_avg' | 'or_count';
+      if (apiRow.row_name === '대리상 총실판') rowType = 'fr_total';
+      else if (apiRow.row_name === '대리상 점당매출') rowType = 'fr_avg';
+      else if (apiRow.row_name === '대리상 매장수') rowType = 'fr_count';
+      else if (apiRow.row_name === '직영 총실판') rowType = 'or_total';
+      else if (apiRow.row_name === '직영 점당매출') rowType = 'or_avg';
+      else rowType = 'or_count';
+      
       return {
-        type: 'summary',
+        type: 'summary' as const,
         rowType,
-        label,
-        channel,
-        months: monthsData
+        label: apiRow.row_name,
+        channel: apiRow.fr_or_cls,
+        months
       };
-    };
-
-    return [
-      calculateSummary(dealerRows, '대리상 점당매출', 'FR', 'fr_avg'),
-      calculateSummary(dealerRows, '대리상 매장수', 'FR', 'fr_count'),
-      calculateSummary(directRows, '직영 점당매출', 'OR', 'or_avg'),
-      calculateSummary(directRows, '직영 매장수', 'OR', 'or_count')
-    ];
-  }, [shopRows, selectedYear]);
+    });
+  }, [apiSummaryRows, selectedYear]);
 
   // 최종 테이블 행 구성
   const allRows = useMemo(() => {
+    // summaryRows가 충분하지 않으면 빈 배열 반환
+    if (summaryRows.length < 6) {
+      return [];
+    }
+    
     const dealerRows = shopRows
       .filter(s => s.channel === 'FR')
-      .sort((a, b) => getSortKey(a.open_dt).localeCompare(getSortKey(b.open_dt)))
+      .sort((a, b) => (a.open_month || '9999-99').localeCompare(b.open_month || '9999-99'))
       .map(row => ({ ...row, type: 'detail' as const, rowType: 'detail' as const }));
     
     const directRows = shopRows
       .filter(s => s.channel === 'OR')
-      .sort((a, b) => getSortKey(a.open_dt).localeCompare(getSortKey(b.open_dt)))
+      .sort((a, b) => (a.open_month || '9999-99').localeCompare(b.open_month || '9999-99'))
       .map(row => ({ ...row, type: 'detail' as const, rowType: 'detail' as const }));
 
     const rows: TableRow[] = [
-      summaryRows[0],
-      summaryRows[1],
+      summaryRows[0], // 대리상 총실판 (fr_total)
+      summaryRows[1], // 대리상 점당매출 (fr_avg)
+      summaryRows[2], // 대리상 매장수 (fr_count)
       ...dealerRows,
-      summaryRows[2],
-      summaryRows[3],
+      summaryRows[3], // 직영 총실판 (or_total)
+      summaryRows[4], // 직영 점당매출 (or_avg)
+      summaryRows[5], // 직영 매장수 (or_count)
       ...directRows
     ];
 
@@ -363,9 +359,11 @@ export default function MLBDashboard() {
       ];
     }
 
+    const frTotalRow = summaryRows.find(r => r.rowType === 'fr_total');
     const frAvgRow = summaryRows.find(r => r.rowType === 'fr_avg');
-    const orAvgRow = summaryRows.find(r => r.rowType === 'or_avg');
     const frCountRow = summaryRows.find(r => r.rowType === 'fr_count');
+    const orTotalRow = summaryRows.find(r => r.rowType === 'or_total');
+    const orAvgRow = summaryRows.find(r => r.rowType === 'or_avg');
     const orCountRow = summaryRows.find(r => r.rowType === 'or_count');
     const dataMonths = months;
     const lastMonth = dataMonths[dataMonths.length - 1];
@@ -839,7 +837,7 @@ export default function MLBDashboard() {
                               <span className="text-lg">📊</span>
                               {(row as SummaryRow).label}
                               {/* 대리상/직영 요약 행에 펼치기 버튼 추가 */}
-                              {(row.rowType === 'fr_avg' || row.rowType === 'fr_count') && row.rowType === 'fr_avg' && (
+                              {row.rowType === 'fr_total' && (
                                 <button
                                   type="button"
                                   onClick={() => setCollapsedFR(prev => !prev)}
@@ -848,7 +846,7 @@ export default function MLBDashboard() {
                                   {collapsedFR ? '펼치기' : '접기'}
                                 </button>
                               )}
-                              {(row.rowType === 'or_avg' || row.rowType === 'or_count') && row.rowType === 'or_avg' && (
+                              {row.rowType === 'or_total' && (
                                 <button
                                   type="button"
                                   onClick={() => setCollapsedOR(prev => !prev)}
@@ -956,7 +954,7 @@ export default function MLBDashboard() {
         {!loading && !error && (
           <section className="mt-8">
             <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-6">
-              <ChinaMapChart brand="M" year={selectedYear} />
+              <ChinaMapChart brand="M" year={selectedYear} shopRows={shopRows} />
             </div>
           </section>
         )}

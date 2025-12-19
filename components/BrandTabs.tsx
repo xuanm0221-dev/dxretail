@@ -9,9 +9,9 @@ export default function BrandTabs({ currentBrand }: BrandTabsProps) {
   const router = useRouter();
 
   const brands = [
-    { id: 'mlb', label: 'MLB', href: '/mlb', color: 'blue' },
+    { id: 'mlb', label: 'MLB', href: '/', color: 'blue' },
     { id: 'mlb-kids', label: 'MLB KIDS', href: '/mlb-kids', color: 'green' },
-    { id: 'discovery', label: 'Discovery', href: '/', color: 'purple' },
+    { id: 'discovery', label: 'Discovery', href: '/discovery', color: 'purple' },
   ];
 
   return (

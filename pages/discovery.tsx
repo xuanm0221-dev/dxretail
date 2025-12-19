@@ -61,10 +61,10 @@ interface ApiDetailRow {
 
 interface ShopRow {
   shop_id: string;
-  shop_nm_ko: string;
+  shop_nm_ko: string; // 한국어 매장명
   channel: string;
-  open_month: string | null;
-  months: Record<string, number | null>;
+  open_month: string | null; // YY.MM 형식
+  months: Record<string, number | null>; // 월별 매출
   city_nm: string | null;
   city_tier_nm: string | null;
   shop_level_nm: string | null;
@@ -85,23 +85,92 @@ interface DetailRow extends ShopRow {
   rowType?: 'detail';
 }
 
-type TableRow = DetailRow | SummaryRow;
+// 수기입력용 가상 행 타입
+interface ManualInputRow {
+  type: 'manual_input';
+  rowType: 'manual_input';
+  id: string;
+  shop_nm_ko: string;
+  channel: 'FR';
+  open_month: '25.12';
+}
 
-export default function MLBDashboard() {
+type TableRow = DetailRow | SummaryRow | ManualInputRow;
+
+export default function Dashboard() {
   const [apiSummaryRows, setApiSummaryRows] = useState<ApiSummaryRow[]>([]);
   const [apiDetailRows, setApiDetailRows] = useState<ApiDetailRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [manualDecValues, setManualDecValues] = useState<Record<string, number | null>>({});
   const [collapsedFR, setCollapsedFR] = useState(true);
   const [collapsedOR, setCollapsedOR] = useState(true);
   const [selectedYear, setSelectedYear] = useState('2025');
+  
+  // 신규대리상 수기입력 값
+  const [manualNewFrValues, setManualNewFrValues] = useState<Record<string, number | null>>({});
+
+  // 신규대리상 이름
+  const [manualNewFrNames, setManualNewFrNames] = useState<Record<string, string>>({});
+
+  // localStorage 초기화 여부 추적
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // 클라이언트 마운트 후 JSON 파일에서 값 읽어오기 (우선), 없으면 localStorage
+  useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        // 1. 먼저 JSON 파일에서 로드 시도 (Git에 커밋된 데이터)
+        const response = await fetch('/data/manual-inputs.json');
+        if (response.ok) {
+          const jsonData = await response.json();
+          
+          // JSON 파일에 데이터가 있으면 사용
+          if (jsonData.manualDecValues && Object.keys(jsonData.manualDecValues).length > 0) {
+            setManualDecValues(jsonData.manualDecValues);
+          }
+          if (jsonData.manualNewFrValues && Object.keys(jsonData.manualNewFrValues).length > 0) {
+            setManualNewFrValues(jsonData.manualNewFrValues);
+          }
+          if (jsonData.manualNewFrNames && Object.keys(jsonData.manualNewFrNames).length > 0) {
+            setManualNewFrNames(jsonData.manualNewFrNames);
+          }
+        }
+      } catch (err) {
+        console.log('JSON 파일 로드 실패, localStorage에서 로드 시도');
+      }
+      
+      // 2. localStorage에서 추가 로드 (로컬 작업 중인 데이터)
+      const savedDecValues = localStorage.getItem('manualDecValues');
+      const savedNewFrValues = localStorage.getItem('manualNewFrValues');
+      const savedNewFrNames = localStorage.getItem('manualNewFrNames');
+      
+      // localStorage에 더 많은 데이터가 있으면 병합
+      if (savedDecValues) {
+        const localData = JSON.parse(savedDecValues);
+        setManualDecValues(prev => ({ ...prev, ...localData }));
+      }
+      if (savedNewFrValues) {
+        const localData = JSON.parse(savedNewFrValues);
+        setManualNewFrValues(prev => ({ ...prev, ...localData }));
+      }
+      if (savedNewFrNames) {
+        const localData = JSON.parse(savedNewFrNames);
+        setManualNewFrNames(prev => ({ ...prev, ...localData }));
+      }
+      
+      setIsHydrated(true);
+    };
+    
+    loadInitialData();
+  }, []);
 
   // 한국어 매장명 매핑
   const shopNameKoMap: Record<string, string> = {
     'CN6385': '(창춘) 오야 마이창',
     'CN6382': '(하얼빈) 시청레드스퀘어',
     'CN6384': '(창춘) 오야 상두',
-    'CN6383': '(타이위안) 완샹청',
+    'CN6383': '(타이웬) 완샹청',
     'CN6409': '(충칭) 베이청 티엔지에',
     'CN6410': '(난창) 완샹청',
     'CN6414': '(우한) 우샹 드림 몰',
@@ -125,10 +194,31 @@ export default function MLBDashboard() {
     fetchData();
   }, [selectedYear]);
 
+  // 기존 매장 25.12 수기입력 값 localStorage에 저장 (hydration 완료 후에만)
+  useEffect(() => {
+    if (isHydrated) {
+      localStorage.setItem('manualDecValues', JSON.stringify(manualDecValues));
+    }
+  }, [manualDecValues, isHydrated]);
+
+  // 신규대리상 수기입력 값 localStorage에 저장 (hydration 완료 후에만)
+  useEffect(() => {
+    if (isHydrated) {
+      localStorage.setItem('manualNewFrValues', JSON.stringify(manualNewFrValues));
+    }
+  }, [manualNewFrValues, isHydrated]);
+
+  // 신규대리상 이름 localStorage에 저장 (hydration 완료 후에만)
+  useEffect(() => {
+    if (isHydrated) {
+      localStorage.setItem('manualNewFrNames', JSON.stringify(manualNewFrNames));
+    }
+  }, [manualNewFrNames, isHydrated]);
+
   const fetchData = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/sales-report?brand=M&year=${selectedYear}`);
+      const response = await fetch(`/api/sales-report?brand=X&year=${selectedYear}`);
       const result = await response.json();
       
       if (!response.ok) {
@@ -147,6 +237,7 @@ export default function MLBDashboard() {
     }
   };
 
+  // 오픈날짜를 YY.MM 형식으로 변환
   const formatOpenMonth = (openDt: string | null): string | null => {
     if (!openDt) return null;
     try {
@@ -159,22 +250,24 @@ export default function MLBDashboard() {
     }
   };
 
+  // 오픈날짜를 정렬용으로 변환 (YYYY-MM 형식 유지)
   const getSortKey = (openDt: string | null): string => {
-    if (!openDt) return '9999-99';
+    if (!openDt) return '9999-99'; // NULL은 맨 아래
     return openDt;
   };
 
   // API에서 받은 상세 데이터를 ShopRow 형태로 변환
   const shopRows = useMemo(() => {
     const yearPrefix = selectedYear.slice(-2);
-    const monthCount = (selectedYear === '2025') ? 11 : 12;
     
     return apiDetailRows.map(detail => {
+      // 한국어 매장명 매핑 (shop_id 기반)
       const mappingKey = detail.shop_id.trim().toUpperCase();
       const koreanName = shopNameKoMap[mappingKey] || detail.shop_name;
       
+      // 월별 데이터를 YY.MM 형식 키로 매핑
       const months: Record<string, number | null> = {};
-      for (let i = 1; i <= monthCount; i++) {
+      for (let i = 1; i <= 12; i++) {
         const monthKey = `${yearPrefix}.${String(i).padStart(2, '0')}`;
         const apiMonthKey = `m${String(i).padStart(2, '0')}` as keyof ApiDetailRow;
         months[monthKey] = detail[apiMonthKey] as number | null;
@@ -195,19 +288,32 @@ export default function MLBDashboard() {
     });
   }, [apiDetailRows, selectedYear]);
 
-  // 요약 행 계산 (API 응답 변환)
+  // 신규대리상 수기입력 행 4개 생성
+  const manualInputRows: ManualInputRow[] = useMemo(() => {
+    return [1, 2, 3, 4].map(num => ({
+      type: 'manual_input' as const,
+      rowType: 'manual_input' as const,
+      id: `manual_fr_${num}`,
+      shop_nm_ko: manualNewFrNames[`manual_fr_${num}`] || `신규대리상(12월)_${num}`,
+      channel: 'FR' as const,
+      open_month: '25.12' as const,
+    }));
+  }, [manualNewFrNames]);
+
+  // 요약 행 계산 (API 응답 + 25.12 수기입력 값)
   const summaryRows = useMemo(() => {
     const yearPrefix = selectedYear.slice(-2);
-    const monthCount = (selectedYear === '2025') ? 11 : 12;
     
-    return apiSummaryRows.map(apiRow => {
+    // API 응답을 프론트엔드 형식으로 변환
+    const convertedRows: SummaryRow[] = apiSummaryRows.map(apiRow => {
       const months: Record<string, number | null> = {};
-      for (let i = 1; i <= monthCount; i++) {
+      for (let i = 1; i <= 12; i++) {
         const monthKey = `${yearPrefix}.${String(i).padStart(2, '0')}`;
         const apiMonthKey = `m${String(i).padStart(2, '0')}` as keyof ApiSummaryRow;
         months[monthKey] = apiRow[apiMonthKey] as number | null;
       }
       
+      // row_name에서 rowType 추출
       let rowType: 'fr_total' | 'fr_avg' | 'fr_count' | 'or_total' | 'or_avg' | 'or_count';
       if (apiRow.row_name === '대리상 총실판') rowType = 'fr_total';
       else if (apiRow.row_name === '대리상 점당매출') rowType = 'fr_avg';
@@ -224,9 +330,71 @@ export default function MLBDashboard() {
         months
       };
     });
-  }, [apiSummaryRows, selectedYear]);
+    
+    // 2025년이고 12월 수기입력 값이 있으면 25.12 값 재계산
+    if (selectedYear === '2025') {
+      const dec25Key = '25.12';
+      const dealerShops = shopRows.filter(s => s.channel === 'FR');
+      const directShops = shopRows.filter(s => s.channel === 'OR');
+      
+      // 대리상 수기입력 값 집계
+      let frManualTotal = 0;
+      let frManualCount = 0;
+      dealerShops.forEach(shop => {
+        const rowKey = `shop-${shop.shop_id}`;
+        const val = manualDecValues[rowKey];
+        if (val !== null && val !== undefined && val > 0) {
+          frManualTotal += val;
+          frManualCount += 1;
+        }
+      });
+      // 신규대리상 4개 행
+      [1, 2, 3, 4].forEach(num => {
+        const val = manualNewFrValues[`manual_fr_${num}`];
+        if (val !== null && val !== undefined && val > 0) {
+          frManualTotal += val;
+          frManualCount += 1;
+        }
+      });
+      
+      // 직영 수기입력 값 집계
+      let orManualTotal = 0;
+      let orManualCount = 0;
+      directShops.forEach(shop => {
+        const rowKey = `shop-${shop.shop_id}`;
+        const val = manualDecValues[rowKey];
+        if (val !== null && val !== undefined && val > 0) {
+          orManualTotal += val;
+          orManualCount += 1;
+        }
+      });
+      
+      // 수기입력 값을 요약 행에 추가
+      convertedRows.forEach(row => {
+        if (row.rowType === 'fr_total') {
+          row.months[dec25Key] = (row.months[dec25Key] || 0) + frManualTotal;
+        } else if (row.rowType === 'fr_count') {
+          row.months[dec25Key] = (row.months[dec25Key] || 0) + frManualCount;
+        } else if (row.rowType === 'fr_avg') {
+          const total = convertedRows.find(r => r.rowType === 'fr_total')?.months[dec25Key] || 0;
+          const count = convertedRows.find(r => r.rowType === 'fr_count')?.months[dec25Key] || 0;
+          row.months[dec25Key] = count > 0 ? total / count : 0;
+        } else if (row.rowType === 'or_total') {
+          row.months[dec25Key] = (row.months[dec25Key] || 0) + orManualTotal;
+        } else if (row.rowType === 'or_count') {
+          row.months[dec25Key] = (row.months[dec25Key] || 0) + orManualCount;
+        } else if (row.rowType === 'or_avg') {
+          const total = convertedRows.find(r => r.rowType === 'or_total')?.months[dec25Key] || 0;
+          const count = convertedRows.find(r => r.rowType === 'or_count')?.months[dec25Key] || 0;
+          row.months[dec25Key] = count > 0 ? total / count : 0;
+        }
+      });
+    }
+    
+    return convertedRows;
+  }, [apiSummaryRows, shopRows, manualDecValues, manualNewFrValues, selectedYear]);
 
-  // 최종 테이블 행 구성
+  // 최종 테이블 행 구성 (정렬 포함)
   const allRows = useMemo(() => {
     // summaryRows가 충분하지 않으면 빈 배열 반환
     if (summaryRows.length < 6) {
@@ -248,6 +416,7 @@ export default function MLBDashboard() {
       summaryRows[1], // 대리상 점당매출 (fr_avg)
       summaryRows[2], // 대리상 매장수 (fr_count)
       ...dealerRows,
+      ...manualInputRows, // 신규대리상 수기입력 4개 행 (대리상 매장 맨 아래)
       summaryRows[3], // 직영 총실판 (or_total)
       summaryRows[4], // 직영 점당매출 (or_avg)
       summaryRows[5], // 직영 매장수 (or_count)
@@ -255,13 +424,18 @@ export default function MLBDashboard() {
     ];
 
     return rows;
-  }, [shopRows, summaryRows]);
+  }, [shopRows, summaryRows, manualInputRows]);
 
   // visibleRows 결정 (FR과 OR 각각 독립적으로 펼치기/접기)
   const visibleRows = useMemo(() => {
     return allRows.filter(row => {
       // 요약 행은 항상 표시
       if (row.type === 'summary') return true;
+      
+      // 신규대리상 수기입력 행
+      if (row.type === 'manual_input') {
+        return !collapsedFR; // 대리상이 펼쳐져 있을 때만 표시
+      }
       
       // 일반 매장 행
       if (row.type === 'detail') {
@@ -277,7 +451,7 @@ export default function MLBDashboard() {
     });
   }, [allRows, collapsedFR, collapsedOR]);
 
-  // 대리상(FR) 25.11 기준 TOP3
+  // 대리상(FR) 25.11 기준 TOP3 shop_id 계산
   const top3FrShopIds = useMemo(() => {
     const frShops = shopRows
       .filter(s => s.channel === 'FR')
@@ -298,19 +472,107 @@ export default function MLBDashboard() {
     return new Intl.NumberFormat('ko-KR').format(Math.round(num));
   };
 
+  // 매장수용 포맷 함수 (숫자 뒤에 "개" 붙임)
   const formatCount = (num: number | null | undefined): string => {
     if (num === null || num === undefined) return '-';
     if (num === 0) return '0개';
     return `${new Intl.NumberFormat('ko-KR').format(Math.round(num))}개`;
   };
 
+  // 콤마 제거하고 숫자만 추출
+  const parseFormattedNumber = (value: string): number | null => {
+    const cleaned = value.replace(/,/g, '').trim();
+    if (cleaned === '') return null;
+    const num = parseFloat(cleaned);
+    return isNaN(num) ? null : num;
+  };
+
+  // 숫자를 천단위 콤마 포맷으로 변환 (입력용)
+  const formatInputNumber = (num: number | null | undefined): string => {
+    if (num === null || num === undefined) return '';
+    return new Intl.NumberFormat('ko-KR').format(num);
+  };
+
+  const handleDecValueChange = (key: string, value: string) => {
+    const numValue = parseFormattedNumber(value);
+    setManualDecValues(prev => ({
+      ...prev,
+      [key]: numValue
+    }));
+  };
+
+  // 신규대리상 수기입력 값 변경 핸들러
+  const handleNewFrValueChange = (key: string, value: string) => {
+    const numValue = parseFormattedNumber(value);
+    setManualNewFrValues(prev => ({
+      ...prev,
+      [key]: numValue
+    }));
+  };
+
+  // 신규대리상 이름 변경 핸들러
+  const handleNewFrNameChange = (key: string, value: string) => {
+    setManualNewFrNames(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  };
+
+  // JSON 파일 다운로드 함수
+  const downloadJsonFile = () => {
+    const dataToSave = {
+      lastUpdated: new Date().toISOString(),
+      manualDecValues,
+      manualNewFrValues,
+      manualNewFrNames
+    };
+    
+    const jsonString = JSON.stringify(dataToSave, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'manual-inputs.json';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleSave = () => {
+    const dataToSave = {
+      lastUpdated: new Date().toISOString(),
+      manualDecValues,
+      manualNewFrValues,
+      manualNewFrNames
+    };
+    console.log('저장할 데이터:', dataToSave);
+    
+    const existingCount = Object.values(manualDecValues).filter(v => v !== null && v > 0).length;
+    const newFrCount = Object.values(manualNewFrValues).filter(v => v !== null && v > 0).length;
+    const nameCount = Object.values(manualNewFrNames).filter(v => v && v.trim() !== '').length;
+    
+    // JSON 파일 다운로드
+    downloadJsonFile();
+    
+    alert(`25.12 매출 입력값이 다운로드되었습니다.\n- 기존 매장: ${existingCount}개\n- 신규대리상: ${newFrCount}개\n- 신규대리상 이름 수정: ${nameCount}개\n\n📁 다운로드된 'manual-inputs.json' 파일을\n프로젝트의 public/data/ 폴더에 덮어쓰기 후\nGit 커밋 & 푸시하세요!`);
+  };
+
   const isSummaryRow = (row: TableRow): boolean => {
     return row.type === 'summary';
+  };
+
+  const isManualInputRow = (row: TableRow): row is ManualInputRow => {
+    return row.type === 'manual_input';
   };
 
   const getRowKey = (row: TableRow, index: number): string => {
     if (row.type === 'summary') {
       return `summary-${row.label}`;
+    }
+    if (row.type === 'manual_input') {
+      return row.id;
     }
     return `shop-${row.shop_id}`;
   };
@@ -318,8 +580,7 @@ export default function MLBDashboard() {
   // 테이블 헤더용 월 배열
   const months = useMemo(() => {
     const yearPrefix = selectedYear.slice(-2);
-    const monthCount = (selectedYear === '2025') ? 11 : 12;
-    return Array.from({ length: monthCount }, (_, i) => 
+    return Array.from({ length: 12 }, (_, i) => 
       `${yearPrefix}.${String(i + 1).padStart(2, '0')}`
     );
   }, [selectedYear]);
@@ -336,39 +597,44 @@ export default function MLBDashboard() {
     '港澳台': '홍콩/마카오/대만',
   };
 
+  // 지역명 한국어 변환 함수 (슬래시로 구분된 복합 값도 처리)
   const toKoreanRegion = (region: string | null): string => {
     if (!region) return '기타';
+    // 직접 매핑이 있으면 반환
     if (regionNameKoMap[region]) return regionNameKoMap[region];
+    // 슬래시(/)로 구분된 경우 각각 변환
     if (region.includes('/')) {
       return region.split('/').map(r => regionNameKoMap[r.trim()] || r.trim()).join('/');
     }
     return region;
   };
 
+  // K 단위 포맷 함수 (1000으로 나눔)
   const toK = (num: number): string => {
     return `${Math.round(num / 1000)}K`;
   };
 
-  // AI 분석 요약 데이터
+  // AI 분석 요약 데이터 (실제 데이터 기반 동적 생성)
   const analysisCards = useMemo(() => {
     if (summaryRows.length === 0 || shopRows.length === 0) {
       return [
-        { id: "trend", label: "월별 추세", description: "데이터 로딩 중...", color: "blue" },
+        { id: "trend", label: "월별 추세", description: "데이터 로딩 중...", color: "purple" },
         { id: "region", label: "지역별 성과", description: "데이터 로딩 중...", color: "mint" },
         { id: "newShop", label: "신규점 현황", description: "데이터 로딩 중...", color: "yellow" },
       ];
     }
 
+    // 공통 데이터 준비
     const frTotalRow = summaryRows.find(r => r.rowType === 'fr_total');
     const frAvgRow = summaryRows.find(r => r.rowType === 'fr_avg');
     const frCountRow = summaryRows.find(r => r.rowType === 'fr_count');
     const orTotalRow = summaryRows.find(r => r.rowType === 'or_total');
     const orAvgRow = summaryRows.find(r => r.rowType === 'or_avg');
     const orCountRow = summaryRows.find(r => r.rowType === 'or_count');
-    const dataMonths = months;
+    const dataMonths = months.slice(0, 11); // 25.01 ~ 25.11
     const lastMonth = dataMonths[dataMonths.length - 1];
 
-    // 월별 추세 분석
+    // ========== 1. 월별 추세 분석 ==========
     const overallAvgs: number[] = [];
     const overallCounts: number[] = [];
     
@@ -403,7 +669,8 @@ export default function MLBDashboard() {
       }
     }
 
-    // 도시/지역 분석
+    // ========== 2. 도시/지역 분석 (도시 티어 + 지역 구분 통합) ==========
+    // 도시 티어별 분석
     const tierGroups: Record<string, { total: number; count: number }> = {};
     shopRows.forEach(shop => {
       const tier = shop.city_tier_nm || '기타';
@@ -423,6 +690,7 @@ export default function MLBDashboard() {
       }))
       .sort((a, b) => b.avg - a.avg);
 
+    // 지역(Region)별 분석
     const regionGroups: Record<string, { total: number; count: number }> = {};
     shopRows.forEach(shop => {
       const region = toKoreanRegion(shop.sale_region_nm);
@@ -444,6 +712,7 @@ export default function MLBDashboard() {
       .sort((a, b) => b.total - a.total);
 
     let cityRegionDesc = "";
+    // 도시 티어 분석
     if (tierStats.length >= 2) {
       const top = tierStats[0];
       const second = tierStats[1];
@@ -454,6 +723,7 @@ export default function MLBDashboard() {
     } else if (tierStats.length === 1) {
       cityRegionDesc = `[도시티어] ${tierStats[0].tier} ${tierStats[0].count}개점, ${toK(tierStats[0].avg)}. `;
     }
+    // 지역 분석 추가
     if (regionStats.length >= 2) {
       const totalSales = regionStats.reduce((sum, r) => sum + r.total, 0);
       const topRegions = regionStats.slice(0, 3);
@@ -467,6 +737,7 @@ export default function MLBDashboard() {
       cityRegionDesc = "도시/지역 데이터 분석 중...";
     }
 
+    // ========== 3. 매장 분석 (매장타입 + TOP매장 + 신규점 통합) ==========
     // 매장 타입별 분석
     const typeGroups: Record<string, { total: number; count: number }> = {};
     shopRows.forEach(shop => {
@@ -487,6 +758,7 @@ export default function MLBDashboard() {
       }))
       .sort((a, b) => b.avg - a.avg);
 
+    // TOP 매장 분석
     const shopPerformance = shopRows
       .map(shop => ({
         name: shop.shop_nm_ko,
@@ -498,6 +770,7 @@ export default function MLBDashboard() {
 
     const topPerformers = shopPerformance.slice(0, 3);
 
+    // 신규점 분석
     const newShops = shopRows
       .filter(shop => shop.open_month && shop.open_month >= '25.08')
       .map(shop => ({
@@ -507,7 +780,9 @@ export default function MLBDashboard() {
       }))
       .sort((a, b) => b.lastMonth - a.lastMonth);
 
+    // ========== 박스2: 지역별 성과 (도시티어 + 지역구분 + TOP매장) ==========
     let regionDesc = "";
+    // 도시 티어
     if (tierStats.length >= 2) {
       const top = tierStats[0];
       const second = tierStats[1];
@@ -516,6 +791,7 @@ export default function MLBDashboard() {
         : 0;
       regionDesc = `${top.tier}(${toK(top.avg)}, ${top.count}개) 최고 실적. ${second.tier} 대비 ${diff}%↑ 안정적 성과. `;
     }
+    // 지역 구분
     if (regionStats.length >= 2) {
       const topRegion = regionStats[0];
       const totalSales = regionStats.reduce((sum, r) => sum + r.total, 0);
@@ -523,6 +799,7 @@ export default function MLBDashboard() {
       const regionList = regionStats.slice(0, 3).map(r => r.region).join(', ');
       regionDesc += `${regionList}는 본토 그룹으로 ${regionStats.slice(0, 3).reduce((sum, r) => sum + r.count, 0)}개점 운영, ${lastMonth} 평균 ${toK(regionStats.slice(0, 3).reduce((sum, r) => sum + r.avg, 0) / 3)}.`;
     }
+    // TOP 매장
     if (topPerformers.length > 0) {
       const topNames = topPerformers.slice(0, 2).map(s => `${s.name}(${toK(s.lastMonth)})`).join(', ');
       regionDesc = `${topNames} 최고 실적. ` + regionDesc;
@@ -531,7 +808,9 @@ export default function MLBDashboard() {
       regionDesc = "지역별 성과 데이터 분석 중...";
     }
 
+    // ========== 박스3: 신규점 현황 (매장타입 + 신규점) ==========
     let newShopDesc = "";
+    // 신규점 오픈 현황
     if (newShops.length > 0) {
       const openMonths = Array.from(new Set(newShops.map(s => s.openMonth))).sort();
       const monthRange = openMonths.length > 1 ? `${openMonths[0]}~${openMonths[openMonths.length - 1]}` : openMonths[0];
@@ -540,10 +819,12 @@ export default function MLBDashboard() {
       
       newShopDesc = `${monthRange} ${newShops.length}개 신규점 집중 오픈. `;
       
+      // 강세 매장
       if (strongNewShops.length > 0) {
         const strongNames = strongNewShops.slice(0, 2).map(s => `${s.name}(${toK(s.lastMonth)})`).join(', ');
         newShopDesc += `${strongNames} 강세, `;
       }
+      // 약세 매장
       if (weakNewShops.length > 0) {
         const weakNames = weakNewShops.slice(0, 1).map(s => `${s.name}(${toK(s.lastMonth)})`).join(', ');
         newShopDesc += `반면 ${weakNames}는 초기 육성 필요. `;
@@ -552,6 +833,7 @@ export default function MLBDashboard() {
     } else {
       newShopDesc = "최근 신규점 없음. 기존 매장 안정적 운영 중.";
     }
+    // 매장 타입 추가
     if (typeStats.length >= 2) {
       const typeList = typeStats.slice(0, 2).map(t => `${t.type}(${toK(t.avg)}, ${t.count}개)`).join(', ');
       newShopDesc = `[타입] ${typeList}. ` + newShopDesc;
@@ -562,19 +844,19 @@ export default function MLBDashboard() {
         id: "trend",
         label: "월별 추세",
         description: trendDesc || "월별 추세 분석 중...",
-        color: "blue",
+        color: "purple", // 보라색
       },
       {
         id: "region",
         label: "지역별 성과",
         description: regionDesc,
-        color: "mint",
+        color: "mint", // 민트색
       },
       {
         id: "newShop",
         label: "신규점 현황",
         description: newShopDesc,
-        color: "yellow",
+        color: "yellow", // 노란색
       },
     ];
   }, [summaryRows, shopRows, months]);
@@ -586,13 +868,19 @@ export default function MLBDashboard() {
         <div className="sticky top-0 z-50 bg-gray-100 rounded-xl mb-6 px-6 py-5">
           <div className="flex items-center justify-between mb-4">
             <div className="text-center flex-1">
-              <h1 className="text-5xl font-bold text-blue-600 tracking-wide">
-                MLB 매장별 리테일 매출
+              <h1 className="text-5xl font-bold text-purple-600 tracking-wide">
+                Discovery 매장별 리테일 매출
               </h1>
             </div>
+            <button
+              onClick={handleSave}
+              className="px-4 py-2 bg-purple-500 text-white text-sm rounded-lg hover:bg-purple-600 font-medium transition-colors duration-200"
+            >
+              💾 25.12 저장
+            </button>
           </div>
           <div className="flex justify-center">
-            <BrandTabs currentBrand="mlb" />
+            <BrandTabs currentBrand="discovery" />
           </div>
         </div>
 
@@ -603,13 +891,14 @@ export default function MLBDashboard() {
               {/* 왼쪽 3개 분석 박스 */}
               <div className="lg:col-span-3 grid gap-4 md:grid-cols-3">
                 {analysisCards.map((card) => {
+                  // 색상별 스타일 정의
                   const colorStyles: Record<string, { bg: string; border: string; icon: string; iconBg: string; title: string }> = {
-                    blue: {
-                      bg: 'bg-blue-50',
-                      border: 'border-blue-200',
+                    purple: {
+                      bg: 'bg-purple-50',
+                      border: 'border-purple-200',
                       icon: '📊',
-                      iconBg: 'bg-blue-100',
-                      title: 'text-blue-800',
+                      iconBg: 'bg-purple-100',
+                      title: 'text-purple-800',
                     },
                     mint: {
                       bg: 'bg-teal-50',
@@ -626,7 +915,7 @@ export default function MLBDashboard() {
                       title: 'text-amber-800',
                     },
                   };
-                  const style = colorStyles[card.color] || colorStyles.blue;
+                  const style = colorStyles[card.color] || colorStyles.purple;
                   
                   return (
                     <div
@@ -650,6 +939,7 @@ export default function MLBDashboard() {
               {/* 우측 점포현황 박스 */}
               <div className="lg:col-span-1 bg-gradient-to-b from-sky-50 to-white rounded-xl border border-sky-100 shadow-sm overflow-hidden">
                 <div className="p-3">
+                  {/* 대리상 / 직영 좌우 배치 */}
                   <div className="grid grid-cols-2 gap-2">
                     {/* 대리상 점당매출 */}
                     <div className="bg-white rounded-lg border border-gray-200 p-2">
@@ -753,7 +1043,7 @@ export default function MLBDashboard() {
             <div className="mb-6 bg-white rounded-xl shadow-sm border border-gray-200 p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-1 h-8 bg-blue-500 rounded-full"></div>
+                  <div className="w-1 h-8 bg-purple-500 rounded-full"></div>
                   <h2 className="text-xl font-bold text-gray-800">1. 점당매출</h2>
                 </div>
                 <YearSelector 
@@ -765,15 +1055,17 @@ export default function MLBDashboard() {
             
             <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden w-full">
             <div className="w-full overflow-x-auto overflow-y-auto max-h-[calc(100vh-300px)]">
-              <table className="border-collapse w-full" style={{ tableLayout: 'fixed', minWidth: '1620px' }}>
+              <table className="border-collapse w-full" style={{ tableLayout: 'fixed', minWidth: '1730px' }}>
+                {/* 컬럼 너비 고정 */}
                 <colgroup>
-                  <col style={{ width: '260px', minWidth: '260px' }} />
-                  <col style={{ width: '70px', minWidth: '70px' }} />
-                  <col style={{ width: '80px', minWidth: '80px' }} />
+                  <col style={{ width: '260px', minWidth: '260px' }} /> {/* 매장명 */}
+                  <col style={{ width: '70px', minWidth: '70px' }} />  {/* 채널 */}
+                  <col style={{ width: '80px', minWidth: '80px' }} />  {/* 오픈월 */}
                   {months.map((month) => (
-                    <col key={month} style={{ width: '110px', minWidth: '110px' }} />
+                    <col key={month} style={{ width: '110px', minWidth: '110px' }} /> /* 1~12월 */
                   ))}
                 </colgroup>
+                {/* 고정 헤더 */}
             <thead className="sticky top-0 z-40">
               <tr className="bg-[#1E3A5F]">
                 <th className="sticky left-0 z-45 bg-[#1E3A5F] border-r border-blue-800 px-3 py-3 text-left font-bold text-white shadow-lg">
@@ -798,23 +1090,29 @@ export default function MLBDashboard() {
                 <tbody>
                   {visibleRows.map((row, idx) => {
                     const isSummary = isSummaryRow(row);
+                    const isManualInput = isManualInputRow(row);
                     const rowKey = getRowKey(row, idx);
                     
-                    const isTop3 = !isSummary && row.type === 'detail' && 
+                    // 대리상 TOP3 여부 확인
+                    const isTop3 = !isSummary && !isManualInput && row.type === 'detail' && 
                       (row as ShopRow).channel === 'FR' && 
                       top3FrShopIds.has((row as ShopRow).shop_id);
                     
+                    // 행 배경색 결정
                     const getRowBg = () => {
                       if (isSummary) {
-                        return 'bg-sky-100';
+                        return 'bg-sky-100'; // 요약행: 하늘색
+                      }
+                      if (isManualInput) {
+                        return 'bg-amber-50';
                       }
                       if (isTop3) {
-                        return 'bg-yellow-100';
+                        return 'bg-yellow-100'; // TOP3: 노란색
                       }
-                      return 'bg-white';
+                      return 'bg-white'; // 일반 매장행: 흰색
                     };
 
-                    const rowBgColor = isSummary ? '#e0f2fe' : isTop3 ? '#fef9c3' : '#ffffff';
+                    const rowBgColor = isSummary ? '#e0f2fe' : isManualInput ? '#fffbeb' : isTop3 ? '#fef9c3' : '#ffffff';
 
                     return (
                       <tr 
@@ -826,6 +1124,8 @@ export default function MLBDashboard() {
                           className={`sticky left-0 z-20 border-r border-gray-300 px-3 py-2 ${
                             isSummary 
                               ? 'font-bold text-gray-800' 
+                              : isManualInput
+                              ? 'text-amber-700 font-medium'
                               : isTop3
                               ? 'text-gray-800 font-medium'
                               : 'text-gray-800 font-medium'
@@ -856,6 +1156,17 @@ export default function MLBDashboard() {
                                 </button>
                               )}
                             </span>
+                          ) : isManualInput ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">📝</span>
+                              <input
+                                type="text"
+                                value={manualNewFrNames[row.id] ?? row.shop_nm_ko}
+                                onChange={(e) => handleNewFrNameChange(row.id, e.target.value)}
+                                placeholder={`신규대리상(12월)_${row.id.replace('manual_fr_', '')}`}
+                                className="flex-1 px-2 py-1 bg-white border-2 border-amber-300 rounded-lg text-sm font-medium text-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400 transition-all duration-200 hover:border-amber-400 shadow-sm min-w-[150px]"
+                              />
+                            </div>
                           ) : (
                             <span className="hover:text-[#5B8DEF] transition-colors">
                               {(row as ShopRow).shop_nm_ko}
@@ -894,6 +1205,8 @@ export default function MLBDashboard() {
                         >
                           {isSummary ? (
                             <span className="text-gray-400">-</span>
+                          ) : isManualInput ? (
+                            <span className="text-amber-600 font-medium">25.12</span>
                           ) : (
                             <span className="text-gray-600 font-medium">
                               {(row as ShopRow).open_month || '-'}
@@ -902,7 +1215,7 @@ export default function MLBDashboard() {
                         </td>
                         
                         {/* 월별 매출 데이터 (25.01 ~ 25.11) */}
-                        {months.map((month, monthIdx) => {
+                        {months.slice(0, 11).map((month, monthIdx) => {
                           return (
                             <td
                               key={month}
@@ -912,14 +1225,60 @@ export default function MLBDashboard() {
                               style={{ backgroundColor: rowBgColor }}
                             >
                               <span className="block truncate">
-                                {isSummary && (row.rowType === 'fr_count' || row.rowType === 'or_count')
-                                  ? formatCount((row as SummaryRow).months[month])
-                                  : formatNumber(isSummary ? (row as SummaryRow).months[month] : (row as ShopRow).months[month])
+                                {isManualInput 
+                                  ? <span className="text-gray-400">-</span>
+                                  : isSummary && (row.rowType === 'fr_count' || row.rowType === 'or_count')
+                                    ? formatCount((row as SummaryRow).months[month])
+                                    : formatNumber(isSummary ? (row as SummaryRow).months[month] : (row as ShopRow).months[month])
                                 }
                               </span>
                             </td>
                           );
                         })}
+                        
+                        {/* 12월 (2025년만 수동 입력) */}
+                        <td 
+                          className={`border-l border-gray-200 px-2 py-2 text-right text-gray-700 ${
+                            isSummary ? 'font-bold' : 'font-medium'
+                          }`}
+                          style={{ backgroundColor: rowBgColor }}
+                        >
+                          {selectedYear === '2025' ? (
+                            // 2025년: 수기입력
+                            isSummary ? (
+                              <span className="block truncate">
+                                {(row.rowType === 'fr_count' || row.rowType === 'or_count')
+                                  ? formatCount((row as SummaryRow).months[months[11]])
+                                  : formatNumber((row as SummaryRow).months[months[11]])
+                                }
+                              </span>
+                            ) : isManualInput ? (
+                              <input
+                                type="text"
+                                value={formatInputNumber(manualNewFrValues[row.id])}
+                                onChange={(e) => handleNewFrValueChange(row.id, e.target.value)}
+                                placeholder="0"
+                                className="w-full px-1 py-1 bg-white border border-gray-300 rounded text-right text-sm font-medium text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400 focus:border-blue-400 box-border"
+                              />
+                            ) : (
+                              <input
+                                type="text"
+                                value={formatInputNumber(manualDecValues[rowKey])}
+                                onChange={(e) => handleDecValueChange(rowKey, e.target.value)}
+                                placeholder="0"
+                                className="w-full px-1 py-1 bg-white border border-gray-300 rounded text-right text-sm font-medium text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400 focus:border-blue-400 box-border"
+                              />
+                            )
+                          ) : (
+                            // 2023, 2024년: 일반 표시
+                            <span className="block truncate">
+                              {isSummary && (row.rowType === 'fr_count' || row.rowType === 'or_count')
+                                ? formatCount((row as SummaryRow).months[months[11]])
+                                : formatNumber(isSummary ? (row as SummaryRow).months[months[11]] : (row as ShopRow).months[months[11]])
+                              }
+                            </span>
+                          )}
+                        </td>
                       </tr>
                     );
                   })}
@@ -933,11 +1292,11 @@ export default function MLBDashboard() {
         {/* 하단 정보 및 새로고침 */}
         <div className="mt-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/60 backdrop-blur-sm rounded-xl p-4 shadow-md">
           <p className="text-sm text-gray-600 flex items-center gap-2">
-            <span className="text-blue-500">💡</span>
+            <span className="text-amber-500">💡</span>
             <span>
               {selectedYear === '2025' 
-                ? 'MLB 브랜드는 2025년 1~11월 데이터만 표시됩니다.' 
-                : `MLB 브랜드 ${selectedYear}년 데이터를 표시하고 있습니다. (1~12월)`
+                ? '25.12 컬럼은 수동 입력입니다. 신규대리상 4개 행의 이름과 입력값은 새로고침해도 유지됩니다.' 
+                : `${selectedYear}년 데이터를 표시하고 있습니다. (1~12월)`
               }
             </span>
           </p>
@@ -954,17 +1313,16 @@ export default function MLBDashboard() {
         {!loading && !error && (
           <section className="mt-8">
             <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-6">
-              <ChinaMapChart brand="M" year={selectedYear} shopRows={shopRows} />
+              <ChinaMapChart brand="X" year={selectedYear} shopRows={shopRows} />
             </div>
           </section>
         )}
 
         {/* 대리상별 출고/판매 매출 표 */}
         {!loading && !error && (
-          <DealerSalesTable brand="M" initialYear={selectedYear} />
+          <DealerSalesTable brand="X" initialYear={selectedYear} />
         )}
       </div>
     </div>
   );
 }
-
